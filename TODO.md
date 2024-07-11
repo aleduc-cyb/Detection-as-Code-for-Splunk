@@ -1,6 +1,5 @@
 - [ ] Performance Testing:
   - Test query execution time
-  - Check for efficient use of indexers
   - Validate that queries don't exceed resource limits
 
 - [ ] False Positive/Negative Testing:

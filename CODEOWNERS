@@ -1,0 +1,5 @@
+# Require review for all files except in the queries directory
+* @maintainers
+
+# Allow developers to modify files in the queries directory without review
+/detections/ @analysts
