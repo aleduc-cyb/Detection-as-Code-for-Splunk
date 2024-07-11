@@ -1,0 +1,10 @@
+name: Failed Login Attempts
+description: Detects multiple failed login attempts from the same source
+search: |
+  index=authentication sourcetype=auth_logs failed_login=true 
+  | stats count by src_ip 
+  | where count > 5
+schedule: "*/15 * * * *"
+alert_type: email
+alert_recipients:
+  - security@example.com

@@ -1,0 +1,67 @@
+stages:
+  - validate
+  - test
+  - plan
+  - apply
+
+variables:
+  CHANGED_FILES: ""
+
+.get_changed_files: &get_changed_files
+  - |
+    if [ "$CI_MERGE_REQUEST_ID" ]; then
+      CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRT origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD | grep '^queries/.*\.yml$' | tr '\n' ' ')
+    else
+      CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRT $CI_COMMIT_BEFORE_SHA $CI_COMMIT_SHA | grep '^queries/.*\.yml$' | tr '\n' ' ')
+    fi
+  - echo "Changed files: $CHANGED_FILES"
+
+
+.mr_and_main_rules: &mr_and_main_rules
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+variables:
+  TF_ROOT: ${CI_PROJECT_DIR}/tofu
+
+validate_queries:
+  stage: validate
+  script:
+    - python scripts/validate_splunk_queries.py $CHANGED_FILES
+  <<: *mr_and_main_rules
+
+comprehensive_tests:
+  stage: test
+  script:
+    - *get_changed_files
+    - pip install splunk-sdk
+    - python scripts/comprehensive_tests.py $CHANGED_FILES
+  <<: *mr_and_main_rules
+
+tofu_plan:
+  stage: plan
+  image: 
+    name: ghcr.io/opentofu/opentofu:latest
+    entrypoint: [""]
+  script:
+    - cd ${TF_ROOT}
+    - tofu init
+    - tofu plan -out=tfplan
+  artifacts:
+    paths:
+      - ${TF_ROOT}/tfplan
+  <<: *mr_and_main_rules
+
+tofu_apply:
+  stage: apply
+  image:
+    name: ghcr.io/opentofu/opentofu:latest
+    entrypoint: [""]
+  script:
+    - cd ${TF_ROOT}
+    - tofu init
+    - tofu apply -auto-approve tfplan
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
