@@ -1,0 +1,12 @@
+# Perform tests of the query on the changed files only
+# Runs on merge request to main
+comprehensive_tests:
+  stage: test
+  script:
+    - *get_changed_files
+    - pip install splunk-sdk
+    - python scripts/comprehensive_tests.py $CHANGED_FILES > test_results.txt
+  artifacts:
+    paths:
+      - test_results.txt
+  <<: *mr_and_main_rules

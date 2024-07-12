@@ -1,0 +1,14 @@
+# Deploy the detections in production
+# Only applies when merge request to main has been validated manually
+tofu_apply:
+  stage: apply
+  image:
+    name: ghcr.io/opentofu/opentofu:latest
+    entrypoint: [""]
+  script:
+    - cd ${TF_ROOT}
+    - *tofu_init
+    - tofu apply -auto-approve tfplan
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual

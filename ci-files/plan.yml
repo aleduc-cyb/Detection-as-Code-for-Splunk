@@ -1,0 +1,15 @@
+# Tofu plan to verify the modifications in the infrastructure
+# Only when merge request to main
+tofu_plan:
+  stage: plan
+  image: 
+    name: ghcr.io/opentofu/opentofu:latest
+    entrypoint: [""]
+  script:
+    - cd ${TF_ROOT}
+    - *tofu_init
+    - tofu plan -out=tfplan
+  artifacts:
+    paths:
+      - ${TF_ROOT}/tfplan
+  <<: *mr_and_main_rules

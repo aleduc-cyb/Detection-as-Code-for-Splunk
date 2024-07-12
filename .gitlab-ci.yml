@@ -1,83 +1,13 @@
+include:
+  - local: 'ci-files/validate.yml'
+  - local: 'ci-files/test.yml'
+  - local: 'ci-files/plan.yml'
+  - local: 'ci-files/deploy.yml'
+  - local: 'ci-files/apply.yml'
+
 stages:
   - validate
   - test
   - plan
+  - deploy
   - apply
-
-variables:
-  # Local Vars
-  CHANGED_FILES: ""
-  TF_ROOT: ${CI_PROJECT_DIR}/tofu
-
-  # Tofu vars
-  TF_ADDRESS: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/${CI_PROJECT_NAME}
-  TF_HTTP_ADDRESS: ${TF_ADDRESS}
-  TF_HTTP_LOCK_ADDRESS: ${TF_ADDRESS}/lock
-  TF_HTTP_UNLOCK_ADDRESS: ${TF_ADDRESS}/lock
-  TF_HTTP_METHOD: POST
-  TF_HTTP_USERNAME: gitlab-ci-token
-  TF_HTTP_PASSWORD: ${CI_JOB_TOKEN}
-
-.get_changed_files: &get_changed_files
-  - |
-    if [ "$CI_MERGE_REQUEST_ID" ]; then
-      CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRT origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD | grep '^queries/.*\.yml$' | tr '\n' ' ')
-    else
-      CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRT $CI_COMMIT_BEFORE_SHA $CI_COMMIT_SHA | grep '^queries/.*\.yml$' | tr '\n' ' ')
-    fi
-  - echo "Changed files: $CHANGED_FILES"
-
-
-.mr_and_main_rules: &mr_and_main_rules
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-.tofu_init: &tofu_init
-  - tofu init
-      -backend-config="address=${TF_ADDRESS}"
-      -backend-config="lock_address=${TF_HTTP_LOCK_ADDRESS}"
-      -backend-config="unlock_address=${TF_HTTP_UNLOCK_ADDRESS}"
-      -backend-config="username=${TF_HTTP_USERNAME}"
-      -backend-config="password=${TF_HTTP_PASSWORD}"
-
-validate_queries:
-  stage: validate
-  script:
-    - python scripts/validate_splunk_queries.py $CHANGED_FILES
-  <<: *mr_and_main_rules
-
-comprehensive_tests:
-  stage: test
-  script:
-    - *get_changed_files
-    - pip install splunk-sdk
-    - python scripts/comprehensive_tests.py $CHANGED_FILES
-  <<: *mr_and_main_rules
-
-tofu_plan:
-  stage: plan
-  image: 
-    name: ghcr.io/opentofu/opentofu:latest
-    entrypoint: [""]
-  script:
-    - cd ${TF_ROOT}
-    - *tofu_init
-    - tofu plan -out=tfplan
-  artifacts:
-    paths:
-      - ${TF_ROOT}/tfplan
-  <<: *mr_and_main_rules
-
-tofu_apply:
-  stage: apply
-  image:
-    name: ghcr.io/opentofu/opentofu:latest
-    entrypoint: [""]
-  script:
-    - cd ${TF_ROOT}
-    - *tofu_init
-    - tofu apply -auto-approve tfplan
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual

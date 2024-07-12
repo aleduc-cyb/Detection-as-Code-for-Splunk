@@ -1,0 +1,52 @@
+# Automatically create a merge request when merge request to main
+# Add some info in the description
+create_merge_request:
+  stage: deploy
+  needs:
+    - run_performance_tests
+    - tofu_plan
+  script:
+    - |
+      if [[ "$CI_COMMIT_BRANCH" != "$CI_DEFAULT_BRANCH" ]]; then
+        # Get changed files
+        CHANGED_FILES=$(git diff --name-only origin/$CI_DEFAULT_BRANCH...$CI_COMMIT_SHA | sed 's|^|'"$CI_PROJECT_URL/blob/$CI_COMMIT_SHA/"'|')
+        
+        # Get performance test results
+        PERFORMANCE_RESULTS=$(cat test_results.txt)
+        
+        # Get OpenTofu plan results
+        TOFU_PLAN=$(cat tfplan)
+        
+        # Create description with additional info
+        DESCRIPTION="Automated merge request created by CI/CD pipeline
+
+        ## Author
+        $GITLAB_USER_NAME
+
+        ## Changed Files
+        $CHANGED_FILES
+
+        ## Performance Test Results
+        \`\`\`
+        $PERFORMANCE_RESULTS
+        \`\`\`
+
+        ## OpenTofu Plan
+        <details>
+        <summary>Click to expand OpenTofu plan</summary>
+
+        \`\`\`
+        $TOFU_PLAN
+        \`\`\`
+        </details>
+        "
+        
+        # Create merge request
+        curl --request POST --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests" \
+        --form "source_branch=${CI_COMMIT_BRANCH}" \
+        --form "target_branch=${CI_DEFAULT_BRANCH}" \
+        --form "title=Merge ${CI_COMMIT_BRANCH} into ${CI_DEFAULT_BRANCH}" \
+        --form "description=${DESCRIPTION}"
+      fi
+  <<: *mr_and_main_rules

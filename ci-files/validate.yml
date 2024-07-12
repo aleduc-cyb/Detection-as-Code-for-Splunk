@@ -1,0 +1,7 @@
+# Perform query validation on the changed files only
+# Runs on merge request to main
+validate_queries:
+  stage: validate
+  script:
+    - python scripts/validate_splunk_queries.py $CHANGED_FILES
+  <<: *mr_and_main_rules
